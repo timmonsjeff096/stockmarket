@@ -8,7 +8,7 @@ import numerapi
 NAPI = numerapi.NumerAPI(verbosity="info")
 
 # Directory to save the data to (set this yourself)
-DIR = "C:\Python\Projects\Stocks\data"
+DIR = "C:\Python\Projects\stockmarket\data"
 
 # Set seed for reproducability
 seed = 1234
