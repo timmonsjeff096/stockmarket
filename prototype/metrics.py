@@ -8,6 +8,7 @@ def get_group_stats(df: pd.DataFrame) -> pd.DataFrame:
     """
     Create features by calculating statistical attributes for each group.
     :param df: Pandas DataFrame containing all features
+    :return: Pandas dataframe with stats columns appended
     """
     for group in ["intelligence", "wisdom", "charisma", "dexterity", "strength", "constitution"]:
         cols = [col for col in df.columns if group in col]
@@ -63,7 +64,6 @@ def evaluate(df: pd.DataFrame) -> tuple:
 
 # ######################################################################################################################
 
-# set_pd_option()
 # training_data = data_processing.get_training_data()
 # test_data = data_processing.get_test_data()
 
@@ -71,3 +71,4 @@ def evaluate(df: pd.DataFrame) -> tuple:
 # print(f"Group stats calculated: {training_data_stats}")
 
 # TODO: Implement evaluate after modeling
+# TODO: Numerai Compute automation

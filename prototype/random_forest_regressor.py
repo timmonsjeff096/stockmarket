@@ -1,15 +1,29 @@
-from sklearn.ensemble import RandomForestRegressor
+# from sklearn.ensemble import RandomForestRegressor
 import data_processing
+import pandas as pd
 
-data_processing.set_pd_option()
+
+def set_pd_option():
+    """
+    Set pandas dataframe output configuration
+    """
+    pd.set_option('display.max_rows', 25)
+    pd.set_option('display.min_rows', 25)
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.width', 1000)
+    pd.set_option('display.colheader_justify', 'center')
+    pd.set_option('display.precision', 2)
+
+
+set_pd_option()
 df_train = data_processing.get_training_data()
 df_test = data_processing.get_test_data()
-x_train = df_train.loc[:, :]
-y_train = df_train.columns
-x_test = df_test.loc[:, :]
-y_test = df_test.columns
-regressor = RandomForestRegressor(n_estimators=20, random_state=0)
-regressor.fit(x_train, y_train)
-y_pred = regressor.predict(x_test)
 
+for group in ["intelligence", "wisdom", "charisma", "dexterity", "strength", "constitution"]:
+    cols = [col for col in df_train.columns if group in col]
+    y_train = df_train.pop(cols).values
+    print(y_train)
+
+# regressor = RandomForestRegressor(n_estimators=20, random_state=0)
+# TODO: Fix this
 # TODO: clustering https://sklearn.org/modules/clustering.html
