@@ -64,11 +64,4 @@ def evaluate(df: pd.DataFrame) -> tuple:
 
 # ######################################################################################################################
 
-# training_data = data_processing.get_training_data()
-# test_data = data_processing.get_test_data()
-
-# training_data_stats = get_group_stats(training_data)
-# print(f"Group stats calculated: {training_data_stats}")
-
-# TODO: Implement evaluate after modeling
 # TODO: Numerai Compute automation
