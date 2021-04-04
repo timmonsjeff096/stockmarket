@@ -128,5 +128,8 @@ def get_test(data_dir):
 
 conf = setup_config()
 setup_logging(log_dir=conf.get("log_directory"))
+data = conf.get("data_directory")
+out = conf.get("output_directory")
+
 
 
