@@ -4,6 +4,9 @@ import pandas as pd
 import numerapi
 import json
 import logging
+from sklearn import linear_model
+
+napi = numerapi.NumerAPI(verbosity="info")
 
 
 def setup_config() -> dict:
@@ -40,36 +43,36 @@ def set_pd_option():
 def download_current_data(data_dir):
     """
     Download latest numerai data from numerapi
-    :return: self
     """
     # Initialize Numerai's API (important)
     napi = numerapi.NumerAPI(verbosity="info")
     current_round = napi.get_current_round()
-    full_path = f'{data_dir}/numerai_dataset_{napi.get_current_round()}'
+    last_round = current_round - 1
+    full_path = f'{data_dir}/numerai_dataset_{current_round}'
+
     if os.path.isdir(full_path):
         # df_logger(msg=f"You already have the newest data. Current round is: {current_round}")
         print()
     else:
-        napi.download_current_dataset(dest_path=data_dir, unzip=True)
+        napi.download_current_dataset(data_dir, unzip=True)
 
     # Throw out files we don't need + old files
     if os.path.exists(full_path + '.zip'):
         os.remove(full_path + '.zip')
-    if os.path.exists(data_dir + 'numerai_dataset_' + str(current_round - 1) +
-                      'numerai_tournament_data.csv'):
-        os.remove(data_dir + 'numerai_dataset_' + str(current_round - 1) + 'numerai_tournament_data.csv')
-    if os.path.exists(data_dir + 'numerai_dataset_' + str(current_round - 1) + 'numerai_training_data.csv'):
-        os.remove(data_dir + 'numerai_dataset_' + str(current_round - 1) + 'numerai_training_data.csv')
-    if os.path.exists(data_dir + 'numerai_dataset_' + str(current_round - 1)):
-        os.removedirs(data_dir + 'numerai_dataset_' + str(current_round - 1))
-    if os.path.exists(full_path + 'dataanalysis_and_tips.ipynb'):
-        os.remove(full_path + 'dataanalysis_and_tips.ipynb')
-    if os.path.exists(full_path + 'example_model.py'):
-        os.remove(full_path + 'example_model.py')
-    if os.path.exists(full_path + 'example_model.r'):
-        os.remove(full_path + 'example_model.r')
-    if os.path.exists(full_path + 'example_predictions.csv'):
-        os.remove(full_path + 'example_predictions.csv')
+    if os.path.exists(data_dir + '/numerai_dataset_' + str(last_round) + '/numerai_tournament_data.csv'):
+        os.remove(data_dir + '/numerai_dataset_' + str(last_round) + '/numerai_tournament_data.csv')
+    if os.path.exists(data_dir + '/numerai_dataset_' + str(last_round) + '/numerai_training_data.csv'):
+        os.remove(data_dir + '/numerai_dataset_' + str(last_round) + '/numerai_training_data.csv')
+    if os.path.exists(data_dir + '/numerai_dataset_' + str(last_round)):
+        os.removedirs(data_dir + '/numerai_dataset_' + str(last_round))
+    if os.path.exists(full_path + '/analysis_and_tips.ipynb'):
+        os.remove(full_path + '/analysis_and_tips.ipynb')
+    if os.path.exists(full_path + '/example_model.py'):
+        os.remove(full_path + '/example_model.py')
+    if os.path.exists(full_path + '/example_model.r'):
+        os.remove(full_path + '/example_model.r')
+    if os.path.exists(full_path + '/example_predictions.csv'):
+        os.remove(full_path + '/example_predictions.csv')
     else:
         # df_logger(msg=f"Latest data downloaded successfully. Current round is: {current_round}")
         return
@@ -82,7 +85,7 @@ def load_data(data_dir, reduce_memory: bool = True) -> tuple:
     """
     # Initialize Numerai's API (important)
     napi = numerapi.NumerAPI(verbosity="info")
-    full_path = f'{data_dir}numerai_dataset_{napi.get_current_round()}/'
+    full_path = f'{data_dir}/numerai_dataset_{napi.get_current_round()}/'
     train_path = full_path + 'numerai_training_data.csv'
     test_path = full_path + 'numerai_tournament_data.csv'
     train = pd.read_csv(train_path)
@@ -101,35 +104,33 @@ def load_data(data_dir, reduce_memory: bool = True) -> tuple:
     return dataset
 
 
-def feature_list() -> list:
-    """
-    :return: List of features of dataset
-    """
-    fl = get_train(data_dir=setup_config())
-    for group in ["intelligence", "wisdom", "charisma", "dexterity", "strength", "constitution"]:
-        cols = [col for col in fl.columns if group in col]
-        return cols
-
-
-def get_train(data_dir):
+def get_train(data_dir) -> pd.DataFrame:
     df = load_data(data_dir, reduce_memory=True)
     return df[0]
 
 
-def get_val(data_dir):
+def get_val(data_dir) -> pd.DataFrame:
     df = load_data(data_dir, reduce_memory=True)
     return df[1]
 
 
-def get_test(data_dir):
+def get_test(data_dir) -> pd.DataFrame:
     df = load_data(data_dir, reduce_memory=True)
     return df[2]
 
 
 conf = setup_config()
 setup_logging(log_dir=conf.get("log_directory"))
-data = conf.get("data_directory")
-out = conf.get("output_directory")
+data_path = conf.get("data_directory")
+out_path = conf.get("output_directory")
 
-
-
+download_current_data(data_path)
+train_data = get_train(data_path)
+test_data = get_test(data_path)
+X_train = train_data.values[-4:]
+y_train = train_data.target[-4:]
+X_test = test_data.values[-4:]
+y_test = test_data.target[-4:]
+lin_reg = linear_model.LinearRegression()
+lin_reg.fit(X_train, y_train)
+pred1 = lin_reg.predict(X_test)
