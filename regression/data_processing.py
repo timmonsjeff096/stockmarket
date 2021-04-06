@@ -1,4 +1,6 @@
 import os
+from logging.handlers import RotatingFileHandler
+from logging import Formatter
 import numpy as np
 import pandas as pd
 import numerapi
@@ -20,12 +22,28 @@ def setup_config() -> dict:
 
 
 def setup_logging(log_dir):
-    logger = logging.getLogger('sgd_svrg')
-    logger.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(message)s')
-    fh = logging.FileHandler(log_dir + '\stocklog.log')
-    fh.setFormatter(formatter)
-    logger.addHandler(fh)
+
+    log_file_format = "[%(levelname)s] - %(asctime)s - %(name)s - : %(message)s in %(pathname)s:%(lineno)d"
+    log_console_format = "[%(levelname)s]: %(message)s"
+    # Main logger
+    main_logger = logging.getLogger()
+    main_logger.setLevel(logging.INFO)
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(Formatter(log_console_format))
+
+    exp_file_handler = RotatingFileHandler('{}exp_debug.log'.format(log_dir), maxBytes=10 ** 6, backupCount=5)
+    exp_file_handler.setLevel(logging.DEBUG)
+    exp_file_handler.setFormatter(Formatter(log_file_format))
+
+    exp_errors_file_handler = RotatingFileHandler('{}exp_error.log'.format(log_dir), maxBytes=10 ** 6, backupCount=5)
+    exp_errors_file_handler.setLevel(logging.WARNING)
+    exp_errors_file_handler.setFormatter(Formatter(log_file_format))
+
+    main_logger.addHandler(console_handler)
+    main_logger.addHandler(exp_file_handler)
+    main_logger.addHandler(exp_errors_file_handler)
 
 
 def set_pd_option():
@@ -51,9 +69,9 @@ def download_current_data(data_dir):
     full_path = f'{data_dir}/numerai_dataset_{current_round}'
 
     if os.path.isdir(full_path):
-        # df_logger(msg=f"You already have the newest data. Current round is: {current_round}")
-        print()
+        logging.info(f"Latest data already downloaded. Current round is {current_round}")
     else:
+        logging.info(f"Downloading data for round {current_round}")
         napi.download_current_dataset(data_dir, unzip=True)
 
     # Throw out files we don't need + old files
@@ -74,7 +92,6 @@ def download_current_data(data_dir):
     if os.path.exists(full_path + '/example_predictions.csv'):
         os.remove(full_path + '/example_predictions.csv')
     else:
-        # df_logger(msg=f"Latest data downloaded successfully. Current round is: {current_round}")
         return
 
 
@@ -88,10 +105,10 @@ def load_data(data_dir, reduce_memory: bool = True) -> tuple:
     full_path = f'{data_dir}/numerai_dataset_{napi.get_current_round()}/'
     train_path = full_path + 'numerai_training_data.csv'
     test_path = full_path + 'numerai_tournament_data.csv'
+    logging.info("Loading train data")
     train = pd.read_csv(train_path)
-    # df_logger(msg="Train data loaded.")
+    logging.info("Loading test data")
     test = pd.read_csv(test_path)
-    # df_logger(msg="Test data loaded.")
 
     if reduce_memory:
         num_features = [f for f in train.columns if f.startswith("feature")]
@@ -120,17 +137,10 @@ def get_test(data_dir) -> pd.DataFrame:
 
 
 conf = setup_config()
-setup_logging(log_dir=conf.get("log_directory"))
+setup_logging(conf.get("log_directory"))
 data_path = conf.get("data_directory")
 out_path = conf.get("output_directory")
 
 download_current_data(data_path)
 train_data = get_train(data_path)
 test_data = get_test(data_path)
-X_train = train_data.values[-4:]
-y_train = train_data.target[-4:]
-X_test = test_data.values[-4:]
-y_test = test_data.target[-4:]
-lin_reg = linear_model.LinearRegression()
-lin_reg.fit(X_train, y_train)
-pred1 = lin_reg.predict(X_test)
