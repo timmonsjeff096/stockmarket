@@ -6,7 +6,6 @@ import pandas as pd
 import numerapi
 import json
 import logging
-from sklearn import linear_model
 
 napi = numerapi.NumerAPI(verbosity="info")
 
@@ -21,29 +20,29 @@ def setup_config() -> dict:
         return cfg_values
 
 
-def setup_logging(log_dir):
-
+def initialize_logger(log_dir):
+    """
+    # Enable logging functionality
+    """
     log_file_format = "[%(levelname)s] - %(asctime)s - %(name)s - : %(message)s in %(pathname)s:%(lineno)d"
     log_console_format = "[%(levelname)s]: %(message)s"
-    # Main logger
-    main_logger = logging.getLogger()
-    main_logger.setLevel(logging.INFO)
 
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(Formatter(log_console_format))
+    main_logger = logging.getLogger("")
+    main_logger.setLevel(logging.DEBUG)
 
-    exp_file_handler = RotatingFileHandler('{}exp_debug.log'.format(log_dir), maxBytes=10 ** 6, backupCount=5)
-    exp_file_handler.setLevel(logging.DEBUG)
-    exp_file_handler.setFormatter(Formatter(log_file_format))
+    if main_logger.hasHandlers():
+        main_logger.handlers.clear()
 
-    exp_errors_file_handler = RotatingFileHandler('{}exp_error.log'.format(log_dir), maxBytes=10 ** 6, backupCount=5)
-    exp_errors_file_handler.setLevel(logging.WARNING)
-    exp_errors_file_handler.setFormatter(Formatter(log_file_format))
+    console_handler = logging.StreamHandler(stream=None)
+    console_handler.setLevel(logging.DEBUG)
+    console_handler.setFormatter(logging.Formatter(log_console_format))
+
+    file_handler = RotatingFileHandler('{}\logger.log'.format(log_dir), maxBytes=10 ** 6, backupCount=3)
+    file_handler.setLevel(logging.WARNING)
+    file_handler.setFormatter(Formatter(log_file_format))
 
     main_logger.addHandler(console_handler)
-    main_logger.addHandler(exp_file_handler)
-    main_logger.addHandler(exp_errors_file_handler)
+    main_logger.addHandler(file_handler)
 
 
 def set_pd_option():
@@ -63,8 +62,8 @@ def download_current_data(data_dir):
     Download latest numerai data from numerapi
     """
     # Initialize Numerai's API (important)
-    napi = numerapi.NumerAPI(verbosity="info")
-    current_round = napi.get_current_round()
+    napy = numerapi.NumerAPI(verbosity="info")
+    current_round = napy.get_current_round()
     last_round = current_round - 1
     full_path = f'{data_dir}/numerai_dataset_{current_round}'
 
@@ -101,14 +100,14 @@ def load_data(data_dir, reduce_memory: bool = True) -> tuple:
     :return: A tuple containing the datasets
     """
     # Initialize Numerai's API (important)
-    napi = numerapi.NumerAPI(verbosity="info")
-    full_path = f'{data_dir}/numerai_dataset_{napi.get_current_round()}/'
+    napp = numerapi.NumerAPI(verbosity="info")
+    full_path = f'{data_dir}/numerai_dataset_{napp.get_current_round()}/'
     train_path = full_path + 'numerai_training_data.csv'
     test_path = full_path + 'numerai_tournament_data.csv'
     logging.info("Loading train data")
-    train = pd.read_csv(train_path)
+    train = pd.read_csv(train_path, header=0)
     logging.info("Loading test data")
-    test = pd.read_csv(test_path)
+    test = pd.read_csv(test_path, header=0)
 
     if reduce_memory:
         num_features = [f for f in train.columns if f.startswith("feature")]
@@ -119,6 +118,16 @@ def load_data(data_dir, reduce_memory: bool = True) -> tuple:
     val = test[test['data_type'] == 'validation']
     dataset = train, val, test
     return dataset
+
+
+def era_split(dataset):
+    i = 1
+    j = 1
+    for era in dataset.get("era"):
+        if era == "era" + str(i):
+            era[i] = pd.DataFrame(dataset["era" + i])
+            era[i].display()
+        i = i+j
 
 
 def get_train(data_dir) -> pd.DataFrame:
@@ -136,11 +145,17 @@ def get_test(data_dir) -> pd.DataFrame:
     return df[2]
 
 
+########################################################################################################################
+
+# Initialization of config file and logger
 conf = setup_config()
-setup_logging(conf.get("log_directory"))
+initialize_logger(conf.get("log_directory"))
 data_path = conf.get("data_directory")
 out_path = conf.get("output_directory")
 
 download_current_data(data_path)
 train_data = get_train(data_path)
+
+era_split(train_data)
+
 test_data = get_test(data_path)
