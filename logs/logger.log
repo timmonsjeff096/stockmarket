@@ -1,3 +1,0 @@
-[WARNING] - 2021-04-06 22:35:05,081 - root - : This is warning in C:/Python/Projects/stockmarket/regression/data_processing.py:153
-[ERROR] - 2021-04-06 22:35:05,404 - root - : This is an error in C:/Python/Projects/stockmarket/regression/data_processing.py:154
-[CRITICAL] - 2021-04-06 22:35:05,773 - root - : This is a critical message in C:/Python/Projects/stockmarket/regression/data_processing.py:155

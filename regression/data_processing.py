@@ -10,16 +10,6 @@ import logging
 napi = numerapi.NumerAPI(verbosity="info")
 
 
-def setup_config() -> dict:
-    with open("config.json") as cfg:
-        myjson = json.load(cfg)
-        cfg_values = {"output_directory": myjson.get("output_directory"),
-                      "data_directory": myjson.get("data_directory"),
-                      "log_directory": myjson.get("log_directory")}
-        json.dumps(cfg_values)
-        return cfg_values
-
-
 def initialize_logger(log_dir):
     """
     # Enable logging functionality
@@ -45,117 +35,110 @@ def initialize_logger(log_dir):
     main_logger.addHandler(file_handler)
 
 
-def set_pd_option():
-    """
-    Set pandas dataframe output configuration
-    """
-    pd.set_option('display.max_rows', 25)
-    pd.set_option('display.min_rows', 25)
-    pd.set_option('display.max_columns', None)
-    pd.set_option('display.width', 1000)
-    pd.set_option('display.colheader_justify', 'center')
-    pd.set_option('display.precision', 2)
-
-
-def download_current_data(data_dir):
-    """
-    Download latest numerai data from numerapi
-    """
-    # Initialize Numerai's API (important)
-    napy = numerapi.NumerAPI(verbosity="info")
-    current_round = napy.get_current_round()
-    last_round = current_round - 1
-    full_path = f'{data_dir}/numerai_dataset_{current_round}'
-
-    if os.path.isdir(full_path):
-        logging.info(f"Latest data already downloaded. Current round is {current_round}")
+def setup_config() -> dict:
+    if os.path.isfile("config.json"):
+        with open("config.json") as cfg:
+            myjson = json.load(cfg)
+            if len(myjson["output_directory"]) and len(myjson["data_directory"]) and len(
+                    myjson["log_directory"]) == 0:
+                cfg_values = {"output_directory": "",
+                              "data_directory": "",
+                              "log_directory": ""}
+                json.dumps(cfg_values)
+                logging.error("Enter directory information in configuration file")
+                exit(101)
+            else:
+                cfg_values = {"output_directory": myjson.get("output_directory"),
+                              "data_directory": myjson.get("data_directory"),
+                              "log_directory": myjson.get("log_directory")}
+                json.dumps(cfg_values)
+                return cfg_values
     else:
-        logging.info(f"Downloading data for round {current_round}")
-        napi.download_current_dataset(data_dir, unzip=True)
-
-    # Throw out files we don't need + old files
-    if os.path.exists(full_path + '.zip'):
-        os.remove(full_path + '.zip')
-    if os.path.exists(data_dir + '/numerai_dataset_' + str(last_round) + '/numerai_tournament_data.csv'):
-        os.remove(data_dir + '/numerai_dataset_' + str(last_round) + '/numerai_tournament_data.csv')
-    if os.path.exists(data_dir + '/numerai_dataset_' + str(last_round) + '/numerai_training_data.csv'):
-        os.remove(data_dir + '/numerai_dataset_' + str(last_round) + '/numerai_training_data.csv')
-    if os.path.exists(data_dir + '/numerai_dataset_' + str(last_round)):
-        os.removedirs(data_dir + '/numerai_dataset_' + str(last_round))
-    if os.path.exists(full_path + '/analysis_and_tips.ipynb'):
-        os.remove(full_path + '/analysis_and_tips.ipynb')
-    if os.path.exists(full_path + '/example_model.py'):
-        os.remove(full_path + '/example_model.py')
-    if os.path.exists(full_path + '/example_model.r'):
-        os.remove(full_path + '/example_model.r')
-    if os.path.exists(full_path + '/example_predictions.csv'):
-        os.remove(full_path + '/example_predictions.csv')
-    else:
-        return
+        with open("config.json", "w") as jsonFile:
+            cfg_values = {"output_directory": "", "data_directory": "", "log_directory": ""}
+            json.dump(cfg_values, jsonFile)
+            logging.error("Enter directory information in configuration file")
+            exit(101)
 
 
-def load_data(data_dir, reduce_memory: bool = True) -> tuple:
-    """
-    Get data for current round in pandas dataframe
-    :return: A tuple containing the datasets
-    """
-    # Initialize Numerai's API (important)
-    napp = numerapi.NumerAPI(verbosity="info")
-    full_path = f'{data_dir}/numerai_dataset_{napp.get_current_round()}/'
-    train_path = full_path + 'numerai_training_data.csv'
-    test_path = full_path + 'numerai_tournament_data.csv'
-    logging.info("Loading train data")
-    train = pd.read_csv(train_path, header=0)
-    logging.info("Loading test data")
-    test = pd.read_csv(test_path, header=0)
+class DataProcessing:
+    def __init__(self):
+        cfg_values = setup_config()
+        initialize_logger(cfg_values['log_directory'])
+        self.data_dir = cfg_values['data_directory']
+        self.out_dir = cfg_values['output_directory']
 
-    if reduce_memory:
-        num_features = [f for f in train.columns if f.startswith("feature")]
-        # Reduce column types to float32 for memory
-        train[num_features] = train[num_features].astype(np.float32)
-        test[num_features] = test[num_features].astype(np.float32)
+    def download_current_data(self):
+        """
+        Download latest numerai data from numerapi
+        """
+        data_dir = self.data_dir
+        current_round = napi.get_current_round()
+        last_round = current_round - 1
+        full_path = f'{data_dir}/numerai_dataset_{current_round}'
 
-    val = test[test['data_type'] == 'validation']
-    dataset = train, val, test
-    return dataset
+        if os.path.isdir(full_path):
+            logging.info(f"Latest data already downloaded. Current round is {current_round}")
+        else:
+            logging.info(f"Downloading data for round {current_round}")
+            napi.download_current_dataset(data_dir, unzip=True)
 
+        # Throw out files we don't need + old files
+        if os.path.exists(full_path + '.zip'):
+            os.remove(full_path + '.zip')
+        if os.path.exists(data_dir + '/numerai_dataset_' + str(last_round) + '/numerai_tournament_data.csv'):
+            os.remove(data_dir + '/numerai_dataset_' + str(last_round) + '/numerai_tournament_data.csv')
+        if os.path.exists(data_dir + '/numerai_dataset_' + str(last_round) + '/numerai_training_data.csv'):
+            os.remove(data_dir + '/numerai_dataset_' + str(last_round) + '/numerai_training_data.csv')
+        if os.path.exists(data_dir + '/numerai_dataset_' + str(last_round)):
+            os.removedirs(data_dir + '/numerai_dataset_' + str(last_round))
+        if os.path.exists(full_path + '/analysis_and_tips.ipynb'):
+            os.remove(full_path + '/analysis_and_tips.ipynb')
+        if os.path.exists(full_path + '/example_model.py'):
+            os.remove(full_path + '/example_model.py')
+        if os.path.exists(full_path + '/example_model.r'):
+            os.remove(full_path + '/example_model.r')
+        if os.path.exists(full_path + '/example_predictions.csv'):
+            os.remove(full_path + '/example_predictions.csv')
+        else:
+            return
 
-def era_split(dataset):
-    i = 1
-    j = 1
-    for era in dataset.get("era"):
-        if era == "era" + str(i):
-            era[i] = pd.DataFrame(dataset["era" + i])
-            era[i].display()
-        i = i+j
+    def load_data(self, reduce_memory: bool = True) -> tuple:
+        """
+        Get data for current round in pandas dataframe
+        :return: A tuple containing the datasets
+        """
+        # Initialize Numerai's API (important)
+        data_dir = self.data_dir
+        full_path = f'{data_dir}/numerai_dataset_{napi.get_current_round()}/'
+        train_path = full_path + 'numerai_training_data.csv'
+        test_path = full_path + 'numerai_tournament_data.csv'
+        logging.info("Loading train data")
+        train = pd.read_csv(train_path, header=0)
+        logging.info("Loading test data")
+        test = pd.read_csv(test_path, header=0)
 
+        if reduce_memory:
+            num_features = [f for f in train.columns if f.startswith("feature")]
+            # Reduce column types to float32 for memory
+            train[num_features] = train[num_features].astype(np.float32)
+            test[num_features] = test[num_features].astype(np.float32)
 
-def get_train(data_dir) -> pd.DataFrame:
-    df = load_data(data_dir, reduce_memory=True)
-    return df[0]
+        val = test[test['data_type'] == 'validation']
+        dataset = train, val, test
+        logging.info("Data loaded successfully")
+        return dataset
 
-
-def get_val(data_dir) -> pd.DataFrame:
-    df = load_data(data_dir, reduce_memory=True)
-    return df[1]
-
-
-def get_test(data_dir) -> pd.DataFrame:
-    df = load_data(data_dir, reduce_memory=True)
-    return df[2]
+    def get_data(self) -> tuple:
+        """
+        Call for getting train, val, test(tuple)
+        :return:
+        """
+        dataframe = self.load_data(reduce_memory=True)
+        return dataframe
 
 
 ########################################################################################################################
-
-# Initialization of config file and logger
-conf = setup_config()
-initialize_logger(conf.get("log_directory"))
-data_path = conf.get("data_directory")
-out_path = conf.get("output_directory")
-
-download_current_data(data_path)
-train_data = get_train(data_path)
-
-era_split(train_data)
-
-test_data = get_test(data_path)
+data_processing = DataProcessing()
+data_tup = data_processing.get_data()
+train_data = data_tup[0]
