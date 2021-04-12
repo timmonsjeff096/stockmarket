@@ -1,5 +1,6 @@
 {
-  "output_directory": "C:/Python/Projects/stockmarket/regression/output",
-  "data_directory": "C:/Python/Projects/stockmarket/data",
-  "log_directory": "C:/Python/Projects/stockmarket/logs"
+  "base_directory": "C:/Python/Projects/stockmarket",
+  "output_directory": "/output",
+  "data_directory": "/data",
+  "log_directory": "/logs"
 }

@@ -7,8 +7,6 @@ import numerapi
 import json
 import logging
 
-napi = numerapi.NumerAPI(verbosity="info")
-
 
 def initialize_logger(log_dir):
     """
@@ -39,23 +37,25 @@ def setup_config() -> dict:
     if os.path.isfile("config.json"):
         with open("config.json") as cfg:
             myjson = json.load(cfg)
-            if len(myjson["output_directory"]) and len(myjson["data_directory"]) and len(
-                    myjson["log_directory"]) == 0:
-                cfg_values = {"output_directory": "",
+            if len(myjson["base_directory"]) or len(myjson["output_directory"]) or len(
+                    myjson["data_directory"]) or len(myjson["log_directory"]) != 0:
+                cfg_values = {"base_directory": myjson.get("base_directory"),
+                              "output_directory": myjson.get("output_directory"),
+                              "data_directory": myjson.get("data_directory"),
+                              "log_directory": myjson.get("log_directory")}
+                json.dumps(cfg_values)
+                return cfg_values
+            else:
+                cfg_values = {"base_directory": "",
+                              "output_directory": "",
                               "data_directory": "",
                               "log_directory": ""}
                 json.dumps(cfg_values)
                 logging.error("Enter directory information in configuration file")
                 exit(101)
-            else:
-                cfg_values = {"output_directory": myjson.get("output_directory"),
-                              "data_directory": myjson.get("data_directory"),
-                              "log_directory": myjson.get("log_directory")}
-                json.dumps(cfg_values)
-                return cfg_values
     else:
         with open("config.json", "w") as jsonFile:
-            cfg_values = {"output_directory": "", "data_directory": "", "log_directory": ""}
+            cfg_values = {"base_directory": "", "output_directory": "", "data_directory": "", "log_directory": ""}
             json.dump(cfg_values, jsonFile)
             logging.error("Enter directory information in configuration file")
             exit(101)
@@ -64,16 +64,21 @@ def setup_config() -> dict:
 class DataProcessing:
     def __init__(self):
         cfg_values = setup_config()
-        initialize_logger(cfg_values['log_directory'])
-        self.data_dir = cfg_values['data_directory']
-        self.out_dir = cfg_values['output_directory']
+        self.base_dir = cfg_values["base_directory"]
+        self.log_dir = self.base_dir + cfg_values['log_directory']
+        initialize_logger(self.log_dir)
+        self.data_dir = self.base_dir + cfg_values['data_directory']
+        self.out_dir = self.base_dir + cfg_values['output_directory']
+        self.napi = numerapi.NumerAPI(verbosity="info")
+        self.current_round = self.napi.get_current_round()
 
     def download_current_data(self):
         """
         Download latest numerai data from numerapi
         """
         data_dir = self.data_dir
-        current_round = napi.get_current_round()
+        current_round = self.current_round
+        napi = self.napi
         last_round = current_round - 1
         full_path = f'{data_dir}/numerai_dataset_{current_round}'
 
@@ -109,36 +114,30 @@ class DataProcessing:
         :return: A tuple containing the datasets
         """
         # Initialize Numerai's API (important)
+        self.download_current_data()
         data_dir = self.data_dir
-        full_path = f'{data_dir}/numerai_dataset_{napi.get_current_round()}/'
-        train_path = full_path + 'numerai_training_data.csv'
-        test_path = full_path + 'numerai_tournament_data.csv'
-        logging.info("Loading train data")
-        train = pd.read_csv(train_path, header=0)
-        logging.info("Loading test data")
-        test = pd.read_csv(test_path, header=0)
+        full_path = f'{data_dir}/numerai_dataset_{self.current_round}/'
+        training_path = full_path + 'numerai_training_data.csv'
+        tournament_path = full_path + 'numerai_tournament_data.csv'
+        logging.info("Loading training data")
+        training = pd.read_csv(training_path, header=0)
+        logging.info("Loading tournament data")
+        tournament = pd.read_csv(tournament_path, header=0)
 
         if reduce_memory:
-            num_features = [f for f in train.columns if f.startswith("feature")]
+            num_features = [f for f in training.columns if f.startswith("feature")]
             # Reduce column types to float32 for memory
-            train[num_features] = train[num_features].astype(np.float32)
-            test[num_features] = test[num_features].astype(np.float32)
+            training[num_features] = training[num_features].astype(np.float32)
+            tournament[num_features] = tournament[num_features].astype(np.float32)
 
-        val = test[test['data_type'] == 'validation']
-        dataset = train, val, test
+        dataset = training, tournament
         logging.info("Data loaded successfully")
         return dataset
 
     def get_data(self) -> tuple:
         """
-        Call for getting train, val, test(tuple)
+        Call for getting training and tournament dataframes(tuple)
         :return:
         """
         dataframe = self.load_data(reduce_memory=True)
         return dataframe
-
-
-########################################################################################################################
-data_processing = DataProcessing()
-data_tup = data_processing.get_data()
-train_data = data_tup[0]
